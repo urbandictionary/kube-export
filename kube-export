@@ -34,9 +34,9 @@
       yaml/parse-string
       :items))
 
-(defn apiserver-component?
-  [service]
-  (= "apiserver" (get-in service [:metadata :labels :component])))
+(defn skip-item?
+  [item]
+  (= "apiserver" (get-in item [:metadata :labels :component])))
 
 (defn write-item
   [item]
@@ -57,7 +57,7 @@
   ((if (= "ConfigMap" (:kind item)) write-configmap write-item) item))
 
 (doall (->> (kubectl-get-all)
-            (remove apiserver-component?)
+            (remove skip-item?)
             (map write)))
 
 #_(reply.ReplyMain/main (into-array String ["--standalone"]))
