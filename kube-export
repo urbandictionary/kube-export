@@ -1,32 +1,42 @@
 #!/usr/bin/env inlein
 
-'{:dependencies [[org.clojure/clojure "1.8.0"]
-                 [reply "0.3.7"]
+'{:dependencies [[org.clojure/clojure "1.8.0"] [reply "0.3.7"]
                  [io.forward/yaml "1.0.5"]]}
 
-(require '[clojure.java.shell :refer [sh]]
-         '[yaml.core :as yaml])
+(require '[clojure.java.shell :refer [sh]] '[yaml.core :as yaml] '[clojure.walk :refer [postwalk]] '[clojure.java.io :refer [make-parents]])
 
 (defn walker
-[object]
-(if (map? object) (dissoc object :metadata :terminationMessagePath :dnsPolicy :status :terminationGracePeriodSeconds) object))
-         
-(defn remove-keys
-[object]
-(postwalk walker object))
+  [object]
+  (if (map? object)
+    (dissoc object
+            :metadata
+            :clusterIP
+            :terminationMessagePath :dnsPolicy
+            :status :terminationGracePeriodSeconds)
+    object))
+
+(defn remove-keys [object] (postwalk walker object))
 
 (defn to-yaml
-[object]
-(yaml/generate-string object :dumper-options {:flow-style :block}))
+  [object]
+  (yaml/generate-string object :dumper-options {:flow-style :block}))
 
-(defn dump
-[object file]
-(make-parents file)
-(spit file (to-yaml object)))
+(defn spit-yaml [object file] (make-parents file) (spit file (to-yaml object)))
 
-(def response (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" "all"))))
-(def items (:items response))
-(def item (first items))
+(defn kubectl-get [t] (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t))))
+(defn kubectl-all [] (-> (kubectl-get "all") :items))
+(defn kubectl-configmaps [] (-> (kubectl-get "configmaps") :items))
+(defn is-pod? [{:keys [kind]}] (= "Pod" kind))
+
+(defn write-item [object]
+(spit-yaml (remove-keys object) (format "%s/%s.yml" (:kind object) (:name (:metadata object)))))
+
+(defn write-configmap [object]
+  (doseq [[name content] (seq (:data object))]
+    (spit content (format "%s/%s/%s" (:kind object) (:name (:metadata object)) name))))
+
+#_(-> (kubectl-all) (remove is-pod?) (map write-item))
+#_(-> (kubectl-configmaps) (map write-configmap))
 
 (reply.ReplyMain/main (into-array String ["--standalone"]))
 
