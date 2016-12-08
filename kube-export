@@ -14,8 +14,8 @@
 
 (defn remove-keys
   [item]
-  (let [walker #(if (map? %) (apply dissoc % keys-to-remove) %)])
-  (postwalk walker item))
+  (let [walker #(if (map? %) (apply dissoc % keys-to-remove) %)]
+    (postwalk walker item)))
 
 (defn to-yaml
   [item]
@@ -54,7 +54,7 @@
 
 (defn write
   [item]
-  (case (:kind item) "ConfigMap" (write-configmap item) (write-item item)))
+  ((if (= "ConfigMap" (:kind item)) write-configmap write-item) item))
 
 (doall (->> (kubectl-get-all)
             (remove apiserver-component?)
