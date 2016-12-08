@@ -9,26 +9,24 @@
          '[clojure.java.io :refer [make-parents]])
 
 (defn walker
-  [object]
-  (if (map? object)
-    (dissoc object
-            :creationTimestamp
-            :generation
-            :resourceVersion
-            :selfLink
-            :uid
-            :clusterIP
+  [item]
+  (if (map? item)
+    (dissoc item
+            :creationTimestamp :generation
+            :resourceVersion :selfLink
+            :uid :clusterIP
             :terminationMessagePath :dnsPolicy
             :status :terminationGracePeriodSeconds)
-    object))
+    item))
 
-(defn remove-keys [object] (postwalk walker object))
+(defn remove-keys [item] (postwalk walker item))
 
 (defn to-yaml
-  [object]
-  (yaml/generate-string object :dumper-options {:flow-style :block}))
+  [item]
+  (yaml/generate-string item :dumper-options {:flow-style :block}))
 
-(defn spit-p [contents file]
+(defn spit-p
+  [contents file]
   (make-parents file)
   (println "Writing" file)
   (spit file contents))
@@ -37,26 +35,33 @@
   [t]
   (:items (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t)))))
 
-(defn apiserver-component? [service] (= "apiserver" (get-in service [:metadata :labels :component])))
+(defn apiserver-component?
+  [service]
+  (= "apiserver" (get-in service [:metadata :labels :component])))
 
 (defn write-item
-  [object]
-  (spit-p (to-yaml (remove-keys object))
-          (format "%s/%s.yaml" (:kind object) (:name (:metadata object)))))
+  [item]
+  (spit-p (to-yaml (remove-keys item))
+          (format "%s/%s.yaml" (:kind item) (:name (:metadata item)))))
 
 (defn write-configmap
-  [object]
-  (doseq [[filename content] (seq (:data object))]
+  [item]
+  (doseq [[filename content] (seq (:data item))]
     (spit-p content
             (format "%s/%s/%s"
-                    (:kind object)
-                    (:name (:metadata object))
+                    (:kind item)
+                    (:name (:metadata item))
                     (name filename)))))
 
-(doall (->> (kubectl-get "replicationcontroller") (map write-item)))
-(doall (->> (kubectl-get "service") (remove apiserver-component?) (map write-item)))
-(doall (->> (kubectl-get "daemonset") (map write-item)))
-(doall (->> (kubectl-get "configmap") (map write-configmap)))
+(defn write
+  [item]
+  (case (:kind item)
+    "ConfigMap" (write-configmap item)
+    (write-item item)))
+
+(doall (->> (kubectl-get "rc,service,daemonset,configmap")
+            (remove apiserver-component?)
+            (map write)))
 
 #_(reply.ReplyMain/main (into-array String ["--standalone"]))
 
