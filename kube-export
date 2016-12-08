@@ -8,18 +8,14 @@
          '[clojure.walk :refer [postwalk]]
          '[clojure.java.io :refer [make-parents]])
 
-(defn walker
-  [item]
-  (if (map? item)
-    (dissoc item
-            :creationTimestamp :generation
-            :resourceVersion :selfLink
-            :uid :clusterIP
-            :terminationMessagePath :dnsPolicy
-            :status :terminationGracePeriodSeconds)
-    item))
+(def keys-to-remove
+  [:creationTimestamp :generation :resourceVersion :selfLink :uid :clusterIP
+   :terminationMessagePath :dnsPolicy :status :terminationGracePeriodSeconds])
 
-(defn remove-keys [item] (postwalk walker item))
+(defn remove-keys
+  [item]
+  (let [walker #(if (map? %) (apply dissoc % keys-to-remove) %)])
+  (postwalk walker item))
 
 (defn to-yaml
   [item]
