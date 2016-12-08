@@ -3,14 +3,16 @@
 '{:dependencies [[org.clojure/clojure "1.8.0"] [reply "0.3.7"]
                  [io.forward/yaml "1.0.5"]]}
 
-(require '[clojure.java.shell :refer [sh]] '[yaml.core :as yaml] '[clojure.walk :refer [postwalk]] '[clojure.java.io :refer [make-parents]])
+(require '[clojure.java.shell :refer [sh]]
+         '[yaml.core :as yaml]
+         '[clojure.walk :refer [postwalk]]
+         '[clojure.java.io :refer [make-parents]])
 
 (defn walker
   [object]
   (if (map? object)
     (dissoc object
-            :metadata
-            :clusterIP
+            :metadata :clusterIP
             :terminationMessagePath :dnsPolicy
             :status :terminationGracePeriodSeconds)
     object))
@@ -21,23 +23,43 @@
   [object]
   (yaml/generate-string object :dumper-options {:flow-style :block}))
 
-(defn spit-p [contents file]
-(make-parents file) (spit file contents))
+(defn spit-p [contents file] (make-parents file) (spit file contents))
 
-(defn kubectl-get [t] (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t))))
-(defn kubectl-all [] (-> (kubectl-get "all") :items))
-(defn kubectl-configmaps [] (-> (kubectl-get "configmaps") :items))
+(defn kubectl-get
+  [t]
+  (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t))))
+
+(defn kubectl-all
+  []
+  (-> (kubectl-get "all")
+      :items))
+
+(defn kubectl-configmaps
+  []
+  (-> (kubectl-get "configmaps")
+      :items))
+
 (defn is-pod? [{:keys [kind]}] (= "Pod" kind))
 
-(defn write-item [object]
-(spit-p (to-yaml (remove-keys object)) (format "%s/%s.yml" (:kind object) (:name (:metadata object)))))
+(defn write-item
+  [object]
+  (spit-p (to-yaml (remove-keys object))
+          (format "%s/%s.yml" (:kind object) (:name (:metadata object)))))
 
-(defn write-configmap [object]
+(defn write-configmap
+  [object]
   (doseq [[filename content] (seq (:data object))]
-    (spit-p content (format "%s/%s/%s" (:kind object) (:name (:metadata object)) (name filename)))))
+    (spit-p content
+            (format "%s/%s/%s"
+                    (:kind object)
+                    (:name (:metadata object))
+                    (name filename)))))
 
-(doall (->> (kubectl-all) (remove is-pod?) (map write-item)))
-(doall (->> (kubectl-configmaps) (map write-configmap)))
+(doall (->> (kubectl-all)
+            (remove is-pod?)
+            (map write-item)))
+(doall (->> (kubectl-configmaps)
+            (map write-configmap)))
 
 #_(reply.ReplyMain/main (into-array String ["--standalone"]))
 
