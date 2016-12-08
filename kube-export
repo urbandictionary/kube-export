@@ -12,7 +12,12 @@
   [object]
   (if (map? object)
     (dissoc object
-            :metadata :clusterIP
+            :creationTimestamp
+            :generation
+            :resourceVersion
+            :selfLink
+            :uid
+            :clusterIP
             :terminationMessagePath :dnsPolicy
             :status :terminationGracePeriodSeconds)
     object))
@@ -23,23 +28,16 @@
   [object]
   (yaml/generate-string object :dumper-options {:flow-style :block}))
 
-(defn spit-p [contents file] (make-parents file) (spit file contents))
+(defn spit-p [contents file]
+  (make-parents file)
+  (println "Writing" file)
+  (spit file contents))
 
 (defn kubectl-get
   [t]
-  (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t))))
+  (:items (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t)))))
 
-(defn kubectl-all
-  []
-  (-> (kubectl-get "all")
-      :items))
-
-(defn kubectl-configmaps
-  []
-  (-> (kubectl-get "configmaps")
-      :items))
-
-(defn is-pod? [{:keys [kind]}] (= "Pod" kind))
+(defn apiserver-component? [service] (= "apiserver" (get-in service [:metadata :labels :component])))
 
 (defn write-item
   [object]
@@ -55,11 +53,10 @@
                     (:name (:metadata object))
                     (name filename)))))
 
-(doall (->> (kubectl-all)
-            (remove is-pod?)
-            (map write-item)))
-(doall (->> (kubectl-configmaps)
-            (map write-configmap)))
+(doall (->> (kubectl-get "replicationcontroller") (map write-item)))
+(doall (->> (kubectl-get "service") (remove apiserver-component?) (map write-item)))
+(doall (->> (kubectl-get "daemonset") (map write-item)))
+(doall (->> (kubectl-get "configmap") (map write-configmap)))
 
 #_(reply.ReplyMain/main (into-array String ["--standalone"]))
 

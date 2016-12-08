@@ -1,3 +1,4 @@
 ConfigMap
 ReplicationController
 Service
+DaemonSet
