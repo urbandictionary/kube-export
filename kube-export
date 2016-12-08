@@ -1,8 +1,33 @@
 #!/usr/bin/env inlein
 
 '{:dependencies [[org.clojure/clojure "1.8.0"]
-                 #_[amazonica "0.3.51"]]}
+                 [reply "0.3.7"]
+                 [io.forward/yaml "1.0.5"]]}
 
-#_(require '[amazonica.aws.s3 :as s3])
+(require '[clojure.java.shell :refer [sh]]
+         '[yaml.core :as yaml])
 
-(prn "hello world")
+(defn walker
+[object]
+(if (map? object) (dissoc object :metadata :terminationMessagePath :dnsPolicy :status :terminationGracePeriodSeconds) object))
+         
+(defn remove-keys
+[object]
+(postwalk walker object))
+
+(defn to-yaml
+[object]
+(yaml/generate-string object :dumper-options {:flow-style :block}))
+
+(defn dump
+[object file]
+(make-parents file)
+(spit file (to-yaml object)))
+
+(def response (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" "all"))))
+(def items (:items response))
+(def item (first items))
+
+(reply.ReplyMain/main (into-array String ["--standalone"]))
+
+(shutdown-agents)
