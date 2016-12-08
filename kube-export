@@ -31,9 +31,12 @@
   (println "Writing" file)
   (spit file contents))
 
-(defn kubectl-get
-  [t]
-  (:items (yaml/parse-string (:out (sh "kubectl" "get" "-o=yaml" t)))))
+(defn kubectl-get-all
+  []
+  (-> (sh "kubectl" "get" "-o=yaml" "rc,service,daemonset,configmap")
+      :out
+      yaml/parse-string
+      :items))
 
 (defn apiserver-component?
   [service]
@@ -55,11 +58,9 @@
 
 (defn write
   [item]
-  (case (:kind item)
-    "ConfigMap" (write-configmap item)
-    (write-item item)))
+  (case (:kind item) "ConfigMap" (write-configmap item) (write-item item)))
 
-(doall (->> (kubectl-get "rc,service,daemonset,configmap")
+(doall (->> (kubectl-get-all)
             (remove apiserver-component?)
             (map write)))
 
