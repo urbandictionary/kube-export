@@ -44,7 +44,7 @@
 (defn write-item
   [object]
   (spit-p (to-yaml (remove-keys object))
-          (format "%s/%s.yml" (:kind object) (:name (:metadata object)))))
+          (format "%s/%s.yaml" (:kind object) (:name (:metadata object)))))
 
 (defn write-configmap
   [object]
