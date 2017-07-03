@@ -28,14 +28,15 @@
 
 (defn kubectl-get-all
   []
-  (-> (sh "kubectl" "get" "-o=yaml" "rc,service,daemonset,configmap")
+  (-> (sh "kubectl" "get" "-o=yaml" "all")
       :out
       from-yaml
       :items))
 
 (defn skip-item?
   [item]
-  (= "apiserver" (get-in item [:metadata :labels :component])))
+  (or (= "Pod" (:kind item))
+      (= "apiserver" (get-in item [:metadata :labels :component]))))
 
 (defn write
   [item]
