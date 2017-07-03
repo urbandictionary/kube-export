@@ -35,7 +35,7 @@
 
 (defn skip-item?
   [item]
-  (or (= "Pod" (:kind item))
+  (or (#{"Pod" "Secret" "ReplicaSet" "DaemonSet"} (:kind item))
       (= "apiserver" (get-in item [:metadata :labels :component]))))
 
 (defn write
