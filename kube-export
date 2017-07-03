@@ -14,7 +14,7 @@
 
 (defn to-yaml
   [item]
-  (.safeDump js/jsyaml item))
+  (.safeDump js/jsyaml (clj->js item)))
   
 (defn from-yaml
   [string]
@@ -37,22 +37,11 @@
   [item]
   (= "apiserver" (get-in item [:metadata :labels :component])))
 
-(defn write-item
+(defn write
   [item]
   (spit-p (to-yaml (remove-keys item))
           (:kind item)
           (str (:name (:metadata item)) ".yaml")))
-
-(defn write-configmap
-  [item]
-  (doseq [[filename content] (seq (:data item))]
-    (spit-p content
-            (str (:kind item) "/" (:name (:metadata item)))
-            (name filename))))
-
-(defn write
-  [item]
-  ((if (= "ConfigMap" (:kind item)) write-configmap write-item) item))
 
 (doall (->> (kubectl-get-all)
             (remove skip-item?)
