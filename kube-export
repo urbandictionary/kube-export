@@ -1,12 +1,7 @@
-#!/usr/bin/env inlein
-
-'{:dependencies [[org.clojure/clojure "1.8.0"] [reply "0.3.7"]
-                 [io.forward/yaml "1.0.5"]]}
-
-(require '[clojure.java.shell :refer [sh]]
-         '[yaml.core :as yaml]
-         '[clojure.walk :refer [postwalk]]
-         '[clojure.java.io :refer [make-parents]])
+(require '[planck.shell :refer [sh]]
+         '[cljsjs.js-yaml]
+         '[planck.core :refer [slurp spit]]
+         '[clojure.walk :refer [postwalk keywordize-keys]])
 
 (def keys-to-remove
   [:creationTimestamp :generation :resourceVersion :selfLink :uid :clusterIP
@@ -19,19 +14,23 @@
 
 (defn to-yaml
   [item]
-  (yaml/generate-string item :dumper-options {:flow-style :block}))
+  (.safeDump js/jsyaml item))
+  
+(defn from-yaml
+  [string]
+  (keywordize-keys (js->clj (.safeLoad js/jsyaml string))))
 
 (defn spit-p
-  [contents file]
-  (make-parents file)
+  [contents dir file]
+  (sh "mkdir" "-p" dir)
   (println "Writing" file)
-  (spit file contents))
+  (spit (str dir "/" file) contents))
 
 (defn kubectl-get-all
   []
   (-> (sh "kubectl" "get" "-o=yaml" "rc,service,daemonset,configmap")
       :out
-      yaml/parse-string
+      from-yaml
       :items))
 
 (defn skip-item?
@@ -41,16 +40,15 @@
 (defn write-item
   [item]
   (spit-p (to-yaml (remove-keys item))
-          (format "%s/%s.yaml" (:kind item) (:name (:metadata item)))))
+          (:kind item)
+          (str (:name (:metadata item)) ".yaml")))
 
 (defn write-configmap
   [item]
   (doseq [[filename content] (seq (:data item))]
     (spit-p content
-            (format "%s/%s/%s"
-                    (:kind item)
-                    (:name (:metadata item))
-                    (name filename)))))
+            (str (:kind item) "/" (:name (:metadata item)))
+            (name filename))))
 
 (defn write
   [item]
@@ -59,7 +57,3 @@
 (doall (->> (kubectl-get-all)
             (remove skip-item?)
             (map write)))
-
-#_(reply.ReplyMain/main (into-array String ["--standalone"]))
-
-(shutdown-agents)

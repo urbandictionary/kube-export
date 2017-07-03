@@ -2,3 +2,5 @@ ConfigMap
 ReplicationController
 Service
 DaemonSet
+.classpath
+target
