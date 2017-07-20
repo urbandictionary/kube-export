@@ -28,7 +28,7 @@
 
 (defn kubectl-get-all
   []
-  (-> (sh "kubectl" "get" "-o=yaml" "all")
+  (-> (sh "kubectl" "get" "-o=yaml" "all,configmap")
       :out
       from-yaml
       :items))
